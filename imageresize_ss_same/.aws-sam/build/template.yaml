@@ -1,0 +1,101 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Parameters:
+  SourceBucket:
+    Type: String
+    Description: The name of the source S3 bucket containing the images to be resized
+  ImageType:
+    Type: String
+    Description: The type of the image to be resized (e.g., jpg, png)
+    Default: jpg,png,jpeg,webp
+  Resizes:
+    Type: String
+    Description: The sizes to resize the images to, separated by comma (e.g., 100x100,200x200)
+    Default: 600x370,240x300,848x478,700x300,265x265,322x184,272x165,171x98,270x190,118x68,285x285,75x75,268x153,135x135,75x90,113x113,600x344,140x140,100x100,345x200,270x270,78x78,90x90,174x98
+Resources:
+  UploadBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName:
+        Ref: SourceBucket
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+        - ServerSideEncryptionByDefault:
+            SSEAlgorithm: AES256
+  BucketPolicy1:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: UploadBucket
+      PolicyDocument:
+        Statement:
+        - Action: s3:*
+          Effect: Deny
+          Principal: '*'
+          Resource:
+          - Fn::Sub: arn:aws:s3:::${SourceBucket}/*
+          - Fn::Sub: arn:aws:s3:::${SourceBucket}
+          Condition:
+            Bool:
+              aws:SecureTransport: false
+  MyLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+      Policies:
+      - PolicyName: S3AccessPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action: s3:*
+            Resource:
+            - Fn::Sub: arn:aws:s3:::${SourceBucket}
+            - Fn::Sub: arn:aws:s3:::${SourceBucket}/*
+      RoleName: resize-execution-role
+  MyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      Runtime: nodejs20.x
+      CodeUri: MyFunction
+      Timeout: 303
+      MemorySize: 1024
+      Role:
+        Fn::GetAtt:
+        - MyLambdaExecutionRole
+        - Arn
+      Environment:
+        Variables:
+          RESIZES:
+            Ref: Resizes
+          IMAGE_TYPE:
+            Ref: ImageType
+          DESTINATION_BUCKET:
+            Ref: SourceBucket
+      Events:
+        S3Event:
+          Type: S3
+          Properties:
+            Bucket:
+              Ref: UploadBucket
+            Events:
+            - s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                - Name: prefix
+                  Value: media/
+    Metadata:
+      SamResourceId: MyFunction

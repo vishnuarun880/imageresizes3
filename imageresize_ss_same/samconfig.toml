@@ -1,0 +1,9 @@
+version = 0.1
+
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "imageresize"
+s3_bucket = "imageresam"
+region = "eu-west-3"
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
+parameter_overrides = "SourceBucket=sampleuatrewsa ImageType=jpg,png,jpeg,webp Resizes=600x370,240x300,848x478,700x300,265x265,322x184,272x165,171x98,270x190,118x68,285x285,75x75,268x153,135x135,75x90,113x113,600x344,140x140,100x100,345x200,270x270,78x78,90x90,174x98"
